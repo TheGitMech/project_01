@@ -1,0 +1,93 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .certificate-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 40px;
+        border: 2px solid #gold;
+        background-color: #fff;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    
+    .certificate-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    
+    .certificate-title {
+        font-size: 2.5rem;
+        color: #2c3e50;
+        margin-bottom: 20px;
+    }
+    
+    .certificate-body {
+        text-align: center;
+        font-size: 1.2rem;
+        line-height: 1.8;
+        margin-bottom: 40px;
+    }
+    
+    .certificate-footer {
+        text-align: center;
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+    
+    .certificate-number {
+        font-family: monospace;
+        color: #666;
+    }
+    
+    .verification-link {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="certificate-container">
+        <div class="certificate-header">
+            <h1 class="certificate-title">Certificate of Completion</h1>
+            <p>This is to certify that</p>
+        </div>
+        
+        <div class="certificate-body">
+            <h2>{{ certificate.user.get_full_name }}</h2>
+            <p>has successfully completed the course</p>
+            <h3>"{{ certificate.course.title }}"</h3>
+            <p>with a score of {{ certificate.exam_attempt.score }}%</p>
+            <p>on {{ certificate.issue_date|date:"F d, Y" }}</p>
+        </div>
+        
+        <div class="certificate-footer">
+            <p class="certificate-number">Certificate ID: {{ certificate.certificate_number }}</p>
+            <p class="verification-link">
+                Verify this certificate at:<br>
+                {{ request.scheme }}://{{ request.get_host }}{% url 'view_certificate' certificate.id %}
+            </p>
+        </div>
+    </div>
+    
+    <div class="text-center mt-4">
+        <a href="#" class="btn btn-primary" onclick="window.print()">
+            <i class="fas fa-print"></i> Print Certificate
+        </a>
+        <a href="#" class="btn btn-success" id="downloadPDF">
+            <i class="fas fa-download"></i> Download PDF
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add PDF generation logic here if needed
+</script>
+{% endblock %} 

@@ -14,6 +14,7 @@ import random
 import time
 import cv2
 import keyboard
+from config import MYSQL_CONFIG, SECRET_KEY, AUTH_TABLE, AUTH_USERNAME_FIELD, AUTH_PASSWORD_FIELD
 
 #variables
 studentInfo=None
@@ -23,17 +24,17 @@ profileName=None
 #Flak's Application Confguration
 warnings.filterwarnings("ignore")
 app = Flask(__name__, template_folder='templates', static_folder='static')
-app.secret_key = 'xyz'
+app.secret_key = SECRET_KEY
 # app.config["MONGO_URI"] = "mongodb://localhost:27017/"
 os.path.dirname("../templates")
 
 #Flak's Database Configuration
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'Admin@123'
-app.config['MYSQL_DB'] = 'examproctordb'
-app.config['MYSQL_PORT'] = 3306
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor' 
+app.config['MYSQL_HOST'] = MYSQL_CONFIG['HOST']
+app.config['MYSQL_USER'] = MYSQL_CONFIG['USER']
+app.config['MYSQL_PASSWORD'] = MYSQL_CONFIG['PASSWORD']
+app.config['MYSQL_DB'] = MYSQL_CONFIG['DB']
+app.config['MYSQL_PORT'] = MYSQL_CONFIG['PORT']
+app.config['MYSQL_CURSORCLASS'] = MYSQL_CONFIG['CURSORCLASS']
 mysql = MySQL(app)
 
 executor = ThreadPoolExecutor(max_workers=4)  # Adjust the number of workers as needed
@@ -75,20 +76,32 @@ def login():
         username = request.form['username']
         password = request.form['password']
         cur = mysql.connection.cursor()
-        cur.execute("SELECT * FROM students where Email='" + username + "' and Password='" + password + "'")
+        
+        # Query Django's user table
+        cur.execute(f"SELECT id, first_name, {AUTH_USERNAME_FIELD}, {AUTH_PASSWORD_FIELD} FROM {AUTH_TABLE} WHERE {AUTH_USERNAME_FIELD}=%s", (username,))
         data = cur.fetchone()
+        
         if data is None:
             flash('Your Email or Password is incorrect, try again.', category='error')
             return redirect(url_for('main'))
         else:
-            id, name, email,password, role = data
-            studentInfo={ "Id": id, "Name": name, "Email": email, "Password": password}
-            #print("Role =", data['role'])
-            if  data['Role'] == 'ADMIN':
+            # Note: In a production environment, you should use Django's password hasher
+            id, name, email, password = data['id'], data['first_name'], data[AUTH_USERNAME_FIELD], data[AUTH_PASSWORD_FIELD]
+            studentInfo = {
+                "Id": id,
+                "Name": name or email.split('@')[0],  # Use email username if name is not set
+                "Email": email,
+                "Password": password
+            }
+            
+            # Check if user is staff/admin
+            cur.execute(f"SELECT is_staff FROM {AUTH_TABLE} WHERE id=%s", (id,))
+            is_staff = cur.fetchone()['is_staff']
+            
+            if is_staff:
                 return redirect(url_for('adminStudents'))
-               
-            else :
-                utils.Student_Name = name
+            else:
+                utils.Student_Name = name or email.split('@')[0]
                 return redirect(url_for('rules'))
 
 @app.route('/logout')

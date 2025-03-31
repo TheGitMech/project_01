@@ -1,0 +1,45 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>{{ course.title }} - Final Exams</h2>
+            <p class="text-muted">Complete your course by passing the proctored exam</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        {% for exam in exams %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ exam.title }}</h5>
+                    <p class="card-text">
+                        <strong>Duration:</strong> {{ exam.duration_minutes }} minutes<br>
+                        <strong>Passing Score:</strong> {{ exam.passing_score }}%
+                    </p>
+                    <div class="alert alert-info">
+                        <h6>Before you begin:</h6>
+                        <ul>
+                            <li>Ensure you have a working webcam</li>
+                            <li>Find a quiet, well-lit room</li>
+                            <li>Close all other applications</li>
+                            <li>Have your ID ready for verification</li>
+                        </ul>
+                    </div>
+                    <a href="{% url 'courses:start_exam' exam.id %}" class="btn btn-primary">Start Exam</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-warning">
+                No exams are available for this course yet.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

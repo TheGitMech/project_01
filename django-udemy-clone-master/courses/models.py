@@ -2,6 +2,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
+from django.urls import reverse
 
 from accounts.models import User
 
@@ -54,3 +55,56 @@ class Lesson(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ProctoredExam(models.Model):
+    title = models.CharField(max_length=200)
+    course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='proctored_exams')
+    duration_minutes = models.IntegerField(default=60)
+    passing_score = models.IntegerField(default=50)
+
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+
+
+class ExamAttempt(models.Model):
+    STATUS_CHOICES = [
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+        ('CHEATING_DETECTED', 'Cheating Detected'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    exam = models.ForeignKey(ProctoredExam, on_delete=models.CASCADE)
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField(null=True)
+    score = models.IntegerField(null=True)
+    trust_score = models.FloatField(null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='IN_PROGRESS')
+    profile_image = models.CharField(max_length=255, null=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.exam.title}"
+
+
+class ViolationRecord(models.Model):
+    exam_attempt = models.ForeignKey(ExamAttempt, on_delete=models.CASCADE, related_name='violations')
+    violation_type = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.TextField()
+
+    def __str__(self):
+        return f"{self.exam_attempt} - {self.violation_type}"
+
+
+class Certificate(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    course = models.ForeignKey('Course', on_delete=models.CASCADE)
+    exam_attempt = models.OneToOneField(ExamAttempt, on_delete=models.CASCADE)
+    issue_date = models.DateTimeField(auto_now_add=True)
+    certificate_number = models.CharField(max_length=50, unique=True)
+    pdf_file = models.CharField(max_length=255, null=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.course.title} Certificate"

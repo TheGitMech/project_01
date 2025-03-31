@@ -113,6 +113,18 @@
                             </ul>
                         </div>
                     </div>
+
+                    <!-- Add Exams Section -->
+                    <div class="exams-box">
+                        <div class="exams-title">Course Exams</div>
+                        <div class="exams-content">
+                            <p>Complete the course exams to earn your certificate.</p>
+                            <a href="{% url 'courses:exam_list' course.slug %}" class="btn btn-primary">
+                                <i class="fas fa-clipboard-list"></i> View Exams
+                            </a>
+                        </div>
+                    </div>
+
                     <div class="description-box view-more-parent">
                         <div class="view-more" onclick="viewMore(this,'hide')">
                             + View More
