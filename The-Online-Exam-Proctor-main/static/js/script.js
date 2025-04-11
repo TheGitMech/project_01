@@ -1,212 +1,315 @@
+// DOM Elements
+const startButton = document.getElementById('startButton');
+const timerDisplay = document.getElementById('time');
+const mainContent = document.getElementById('mainContent');
+const quizContent = document.getElementById('quizContent');
+const questionText = document.getElementById('questionText');
+const optionsContainer = document.getElementById('options');
+const completeTest = document.getElementById('completeTest');
 
-var startButton = document.querySelector("#startQuiz");     //Main page start button
-var timer = document.querySelector("#timer");   //Timer when quiz starts
-var mainContent = document.querySelector("#mainContent");   //Start page content div
-var questionEl = document.querySelector("#title");  //card title
-var quizContent = document.querySelector("#quizContent");   //Question options div
-var resultDiv = document.querySelector("#answer");  //Div for showing answer is correct/wrong
-var completeTest = document.querySelector("#completeTest");    //Div for Displying final scores when quiz completed
-var highscoresDiv = document.querySelector("#highscores");  //Div for showing highscores
-var navhighscorelink = document.querySelector("#navhighscorelink");     //highscore navigation link
-var navlink = document.getElementById("navhighscorelink");
+// Global variables
+let questions = [];
+let currentQuestionIndex = 0;
+let answers = [];
+let examTimer;
+let timeLeft;
 
-var secondsLeft = 300, questionIndex = 0,correct = 0 ;
-var totalQuestions = questions.length;
-var question , option1, option2, option3 ,option4 ,ans, previousScores;
-var choiceArray = [], divArray = [];
+// Get URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const examId = urlParams.get('exam_id');
+const attemptId = urlParams.get('attempt_id');
+const userId = urlParams.get('user_id'); // Read userId globally
 
-//create buttons for choices
-for(var i = 0 ; i < 4 ; i++){
-    var dv = document.createElement("div");
-    var ch = document.createElement("button");
-    ch.setAttribute("data-index",i);
-    ch.setAttribute("class","btn rounded-pill mb-2");
-    ch.setAttribute("style","background:#5f9ea0");
-    choiceArray.push(ch);
-    divArray.push(dv);
-}
+// Initialize exam when start button is clicked
+document.getElementById('startButton').addEventListener('click', startExam);
 
-//Start Quiz function
-function startQuiz(){
-
-    startTimer();
-    buildQuestion();
-
-}
-
-//function to start timer when quiz starts
-function startTimer(){
-
-    var timeInterval = setInterval(function(){
-
-        secondsLeft--;
-
-        timer.textContent = "Time : "+ secondsLeft+ " sec";
-//        if(secondsLeft <= 60){
-//            timer.textContent = "Time : 1 min";
-//        }
-
-        if(secondsLeft <= 0 || (questionIndex > totalQuestions-1)){
-
-            resultDiv.style.display = "none";
-            quizContent.style.display = "none";
-            viewResult();
-            clearInterval(timeInterval);
-            timer.textContent = "";
+// Function to start the exam
+async function startExam() {
+    try {
+        // Show loading state
+        document.getElementById('welcomeScreen').innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <h5 class="mt-3">Loading exam questions...</h5>
+            </div>
+        `;
+        
+        // Fetch questions from API
+        const response = await fetch(`/api/questions?exam_id=${examId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch questions');
         }
-
-    },1000);
-}
-
-
-function buildQuestion(){
-
-    //hides start page content
-    questionEl.style.display= "none";
-    mainContent.style.display = "none";
-    quizContent.style.display= "none";
-
-    if(questionIndex > totalQuestions - 1){
-        return;
+        
+        const data = await response.json();
+        if (!data.questions || data.questions.length === 0) {
+            throw new Error('No questions available for this exam');
+        }
+        
+        // Initialize exam data
+        questions = data.questions;
+        answers = new Array(questions.length).fill(null);
+        timeLeft = data.exam.duration_minutes * 60; // Convert to seconds
+        
+        // Hide welcome screen and show quiz
+        document.getElementById('welcomeScreen').style.display = 'none';
+        document.getElementById('quizContent').style.display = 'block';
+        
+        // Initialize question progress dots
+        initializeQuestionProgress();
+        
+        // Show first question
+        showQuestion(0);
+        
+        // Start timer
+        startTimer();
+        
+    } catch (error) {
+        console.error('Error starting exam:', error);
+        document.getElementById('welcomeScreen').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Error Loading Exam</h5>
+                <p>${error.message}</p>
+                <button onclick="location.reload()" class="btn btn-primary mt-3">Try Again</button>
+            </div>
+        `;
     }
-    else{
-        ans =  questions[questionIndex].answer;
+}
 
-        //Display Question
-        questionEl.innerHTML = questions[questionIndex].title;
-        questionEl.setAttribute("class","text-left");
-        questionEl.style.display= "block";
-
-        for(var j = 0 ; j < 4 ; j++){
-            var index = choiceArray[j].getAttribute("data-index");
-            choiceArray[j].textContent = (+index+1) +". "+questions[questionIndex].choices[index];
-            divArray[j].appendChild(choiceArray[j]);
-            quizContent.appendChild(divArray[j]);
-        }
-
+// Function to initialize question progress dots
+function initializeQuestionProgress() {
+    const progressContainer = document.getElementById('questionProgress');
+    progressContainer.innerHTML = '';
+    
+    for (let i = 0; i < questions.length; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'question-dot';
+        dot.textContent = i + 1;
+        dot.onclick = () => showQuestion(i);
+        progressContainer.appendChild(dot);
     }
-    quizContent.style.display= "block"; // Display options
 }
 
-// Event Listener for options buttons
-quizContent.addEventListener("click",function(event){
-
-    var element = event.target;
-    var userAnswer = element.textContent;
-    var userOption   = userAnswer.substring(3, userAnswer.length);
-
-        if(userOption === ans){
-            correct++;
-
-            resultDiv.style.display = "block";
+// Function to show a question
+function showQuestion(index) {
+    if (index < 0 || index >= questions.length) return;
+    
+    currentQuestionIndex = index;
+    const question = questions[index];
+    
+    // Update question number and text
+    document.getElementById('questionNumber').textContent = `Question ${index + 1} of ${questions.length}`;
+    document.getElementById('questionText').textContent = question.question_text;
+    
+    // Create option buttons
+    const optionsContainer = document.getElementById('options');
+    optionsContainer.innerHTML = '';
+    
+    const options = [
+        { key: 'a', text: question.option_a },
+        { key: 'b', text: question.option_b },
+        { key: 'c', text: question.option_c },
+        { key: 'd', text: question.option_d }
+    ];
+    
+    options.forEach(option => {
+        const button = document.createElement('button');
+        button.className = 'option-btn';
+        if (answers[index] === option.key) {
+            button.classList.add('active');
         }
-        else {
-            secondsLeft -= 10;
-
-            setTimeout(function(){
-                resultDiv.textContent = "";
-            },500);
-        }
-
-        questionIndex++;
-        buildQuestion();
-});
-
-
-//Function to show score when quiz completes
-function viewResult(){
-
-    questionEl.innerHTML = "Great Job! Your Test Completed!";
-    questionEl.style.display= "block";
-
-
-    var scoreButton = document.createElement("button");     //Submit User score
-    scoreButton.setAttribute("class","btn rounded-pill mb-2 ml-3 mt-2");
-    scoreButton.setAttribute("style","background:#5f9ea0");
-    scoreButton.textContent = "Submit";
-    completeTest.appendChild(scoreButton);
-
-    scoreButton.addEventListener("click",function(){
-    jQuery.noConflict();
-    jQuery(document).ready(function($) {
-    var inputData = correct;
-                $.ajax({
-                    type: "POST",
-                    url: "/exam",
-                    contentType: "application/json",
-                    data: JSON.stringify({input: inputData}),
-                    success: function(response) {
-                        console.log(response);
-                        console.log(response['output']);
-
-                        // Redirect to result.html on success
-                        window.location.href = "/"+response['link']+"/".concat(response['output']);
-                    },
-                    error: function(xhr, status, error) {
-                        // Handle errors here if needed
-                    }
-
-                });
+        button.textContent = `${option.key.toUpperCase()}. ${option.text}`;
+        button.onclick = () => selectAnswer(option.key);
+        optionsContainer.appendChild(button);
     });
+    
+    // Update navigation buttons
+    updateNavigation();
+    
+    // Update progress dots
+    updateProgress();
+}
+
+// Function to select an answer
+function selectAnswer(answer) {
+    answers[currentQuestionIndex] = answer;
+    
+    // Update option button styles
+    const buttons = document.querySelectorAll('.option-btn');
+    buttons.forEach(button => {
+        button.classList.remove('active');
+        if (button.textContent.startsWith(answer.toUpperCase() + '.')) {
+            button.classList.add('active');
+        }
+    });
+    
+    // Update progress dots
+    updateProgress();
+}
+
+// Function to update progress dots
+function updateProgress() {
+    const dots = document.querySelectorAll('.question-dot');
+    dots.forEach((dot, index) => {
+        dot.classList.remove('current', 'answered');
+        if (index === currentQuestionIndex) {
+            dot.classList.add('current');
+        }
+        if (answers[index] !== null) {
+            dot.classList.add('answered');
+        }
     });
 }
-/*
-//Function to store highscores
-function storeScores(event){
 
-    event.preventDefault();
-    var userName = document.querySelector("#nameInput").value.trim();
-
-    if(userName === null || userName === '') {
-        alert("Please enter user name");
-        return;
-     }
-
-      //Create user object for storing highscore
-        var user = {
-            name : userName,
-            score : correct
-        }
-
-        console.log(user);
-
-        previousScores = JSON.parse(localStorage.getItem("previousScores"));    //get User highscores array in localStorage if exists
-
-        if(previousScores){
-            previousScores.push(user); //Push new user scores in array in localStorage
-        }
-        else{
-            previousScores = [user];    //If No user scores stored in localStorage, create array to store user object
-        }
-
-        // set new submission
-        localStorage.setItem("previousScores",JSON.stringify(previousScores));
-
-        showHighScores(); // Called function to display highscores
-
+// Function to update navigation buttons
+function updateNavigation() {
+    const prevButton = document.getElementById('prevButton');
+    const nextButton = document.getElementById('nextButton');
+    const submitButton = document.getElementById('submitButton');
+    
+    prevButton.disabled = currentQuestionIndex === 0;
+    
+    if (currentQuestionIndex === questions.length - 1) {
+        nextButton.style.display = 'none';
+        submitButton.style.display = 'block';
+    } else {
+        nextButton.style.display = 'block';
+        submitButton.style.display = 'none';
+    }
 }
-*/
-//Start button event listener on start page which starts quiz
-$(document).ready(function() {
-    startButton.addEventListener("click",function(){
-    jQuery.noConflict();
-    jQuery(document).ready(function($) {
-                $.ajax({
-                    type: "POST",
-                    url: "/exam",
-                    contentType: "application/json",
-                    data: JSON.stringify({input:''}),
-                    success: function(response) {
-                        startQuiz();
-                    },
-                    error: function(xhr, status, error) {
-                        // Handle errors here if needed
-                    }
 
-                });
-    });
-    });
-});
+// Navigation button event listeners
+document.getElementById('prevButton').onclick = () => showQuestion(currentQuestionIndex - 1);
+document.getElementById('nextButton').onclick = () => showQuestion(currentQuestionIndex + 1);
+document.getElementById('submitButton').onclick = confirmSubmit;
+
+// Function to start the timer
+function startTimer() {
+    const timerElement = document.getElementById('time');
+    
+    examTimer = setInterval(() => {
+        timeLeft--;
+        
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        
+        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Add warning classes
+        const timer = document.getElementById('timer');
+        if (timeLeft <= 300) { // Last 5 minutes
+            timer.classList.add('danger');
+        } else if (timeLeft <= 600) { // Last 10 minutes
+            timer.classList.add('warning');
+        }
+        
+        if (timeLeft <= 0) {
+            clearInterval(examTimer);
+            submitExam();
+        }
+    }, 1000);
+}
+
+// Function to confirm exam submission
+function confirmSubmit() {
+    const unanswered = answers.filter(ans => ans === null).length;
+    let message = 'Are you sure you want to submit your exam?';
+    
+    if (unanswered > 0) {
+        message = `You have ${unanswered} unanswered question(s). Are you sure you want to submit?`;
+    }
+    
+    if (confirm(message)) {
+        submitExam();
+    }
+}
+
+// Function to submit the exam
+async function submitExam() {
+    // Clear timer
+    clearInterval(examTimer);
+
+    // Display submitting state
+    const quizContent = document.getElementById('quizContent');
+    quizContent.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="sr-only">Submitting...</span>
+            </div>
+            <h5>Submitting your exam...</h5>
+        </div>
+    `;
+
+    // REMOVED: const userId = urlParams.get('user_id'); 
+
+    // Prepare submission data - USE GLOBAL userId
+    const submissionData = {
+        answers: answers,
+        exam_id: examId,         // From global scope
+        attempt_id: attemptId,   // From global scope
+        user_id: userId          // USE GLOBAL userId variable
+    };
+
+    // Add a check for missing IDs before fetching
+    if (!examId || !attemptId || !userId) {
+        console.error("Missing critical IDs for submission:", { examId, attemptId, userId });
+        quizContent.innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Submission Error</h5>
+                <p>Could not retrieve necessary exam information (Exam ID, Attempt ID, or User ID). Please reload and try again.</p>
+                <button onclick="location.reload()" class="btn btn-primary mt-3">Reload</button>
+            </div>
+        `;
+        return; // Stop submission
+    }
+
+    // --> ADD LOGGING HERE <--
+    console.log("Submitting Exam Data:", submissionData);
+
+    try {
+        const response = await fetch("/exam", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submissionData) // Send the complete data object
+        });
+
+        const data = await response.json();
+
+        // Check if the submission was successful on the backend
+        if (response.ok && data.success) {
+            // Redirect to the result page URL provided by the backend
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                console.error('Submission successful, but no redirect URL received.');
+                quizContent.innerHTML = '<div class="alert alert-warning">Exam submitted, but failed to load results page.</div>';
+            }
+        } else {
+            // Handle backend error
+            console.error('Exam submission failed:', data.message || 'Unknown error');
+            quizContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5>Error Submitting Exam</h5>
+                    <p>${data.message || 'Failed to process exam results. Please try again.'}</p>
+                    <button onclick="location.reload()" class="btn btn-primary mt-3">Try Again</button>
+                </div>
+            `;
+        }
+    } catch (error) {
+        // Handle network or other fetch errors
+        console.error('Network error during exam submission:', error);
+        quizContent.innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Network Error</h5>
+                <p>Could not submit exam. Please check your connection and try again.</p>
+                <button onclick="location.reload()" class="btn btn-primary mt-3">Try Again</button>
+            </div>
+        `;
+    }
+}
 
 
 

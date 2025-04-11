@@ -1,15 +1,18 @@
 """
 Database configuration for the Flask application to use Django's MySQL database
 """
+from MySQLdb.cursors import DictCursor
 
 # MySQL Configuration
 MYSQL_CONFIG = {
-    'HOST': 'localhost',
+    'HOST': 'localhost',  # Changed back to localhost as in Django settings
     'USER': 'pcl_user',
     'PASSWORD': 'pcl_password',
     'DB': 'pcl_db',
-    'PORT': 3306,
-    'CURSORCLASS': 'DictCursor'
+    'PORT': '3306',  # Changed to string to match Django settings
+    'CURSORCLASS': DictCursor,
+    'charset': 'utf8mb4',  # Added to match Django settings
+    'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"  # Added to match Django settings
 }
 
 # Session Configuration

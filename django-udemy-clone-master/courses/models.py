@@ -108,3 +108,21 @@ class Certificate(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.course.title} Certificate"
+
+
+class ExamQuestion(models.Model):
+    exam = models.ForeignKey(ProctoredExam, on_delete=models.CASCADE, related_name='questions')
+    question_text = models.TextField()
+    option_a = models.CharField(max_length=200)
+    option_b = models.CharField(max_length=200)
+    option_c = models.CharField(max_length=200)
+    option_d = models.CharField(max_length=200)
+    correct_answer = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.exam.title} - Question {self.id}"
+
+    class Meta:
+        ordering = ['created_at']

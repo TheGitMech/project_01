@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Results - Pass</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .result-card {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .result-header h1 {
+            color: #28a745;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: #e8f5e9;
+            border: 8px solid #28a745;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        
+        .score-text {
+            font-size: 2.5em;
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .result-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .detail-value {
+            font-weight: bold;
+            color: #212529;
+        }
+        
+        .action-buttons {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .action-buttons .btn {
+            margin: 0 10px;
+            padding: 10px 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="result-card bg-white">
+            <div class="result-header">
+                <h1>Congratulations!</h1>
+                <p class="lead">You have passed the exam</p>
+                
+                <div class="score-circle">
+                    <span class="score-text" id="scoreDisplay">0%</span>
+                </div>
+            </div>
+            
+            <div class="result-details">
+                <div class="detail-item">
+                    <span class="detail-label">Correct Answers</span>
+                    <span class="detail-value" id="correctAnswers">0/0</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Passing Score</span>
+                    <span class="detail-value" id="passingScore">40%</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Date</span>
+                    <span class="detail-value" id="examDate">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Email</span>
+                    <span class="detail-value" id="studentEmail">-</span>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="/rules" class="btn btn-primary">Back to Dashboard</a>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get result data from URL
+            const pathParts = window.location.pathname.split('/');
+            const resultData = decodeURIComponent(pathParts[pathParts.length - 1]).split(';');
+            
+            // Parse result data
+            const [email, score, status, date] = resultData;
+            
+            // Update display elements
+            document.getElementById('scoreDisplay').textContent = score + '%';
+            document.getElementById('examDate').textContent = date;
+            document.getElementById('studentEmail').textContent = email;
+            
+            // Animate score
+            animateScore(0, parseInt(score));
+        });
+        
+        function animateScore(start, end) {
+            const duration = 1500;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const currentScore = Math.floor(start + (end - start) * progress);
+                document.getElementById('scoreDisplay').textContent = currentScore + '%';
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+    </script>
+</body>
+</html> 

@@ -1,74 +1,329 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html lang="en">
     <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
-        <link rel="stylesheet" href="{{url_for('static', filename='css/quiz.css')}}">
-         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-        <title>Exam</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ exam_title }} - Online Exam</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">
+        <link rel="stylesheet" href="{{url_for('static', filename='css/iframe.css')}}">
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <style>
+            .camera-container {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 200px;
+                height: 150px;
+                background: #000;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+            }
+            
+            .camera-feed {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            
+            .camera-error {
+                background-color: #ffebee;
+                color: #c62828;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 20px 0;
+                display: none;
+            }
+            
+            .question-card {
+                background-color: #fff;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .question-number {
+                color: #1565c0;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            
+            .question-text {
+                font-size: 1.1em;
+                color: #37474f;
+                margin-bottom: 20px;
+            }
+            
+            .option-btn {
+                width: 100%;
+                margin-bottom: 10px;
+                text-align: left;
+                padding: 12px 15px;
+                border: 1px solid #e0e0e0;
+                border-radius: 6px;
+                transition: all 0.3s ease;
+            }
+            
+            .option-btn:hover {
+                background-color: #f5f5f5;
+                border-color: #bdbdbd;
+            }
+            
+            .option-btn.active {
+                background-color: #e3f2fd;
+                border-color: #2196f3;
+                color: #1565c0;
+            }
+            
+            .timer-container {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #fff;
+                padding: 10px 20px;
+                border-radius: 25px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+            }
+            
+            .timer {
+                font-size: 1.2em;
+                font-weight: bold;
+                color: #1565c0;
+            }
+            
+            .timer.warning {
+                color: #f57c00;
+            }
+            
+            .timer.danger {
+                color: #d32f2f;
+                animation: pulse 1s infinite;
+            }
+            
+            .navigation-buttons {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+                gap: 10px;
+            }
+            
+            .navigation-buttons button {
+                min-width: 120px;
+                padding: 10px 20px;
+                font-weight: 500;
+            }
+            
+            #prevButton {
+                /* background-color: #6c757d; */ /* Default gray */
+                background-color: #5a6268; /* Darker gray */
+                color: white;
+                border: 1px solid #4e555b;
+            }
+            
+            #nextButton {
+                /* background-color: #007bff; */ /* Default blue */
+                background-color: #0069d9; /* Darker blue */
+                color: white;
+                border: 1px solid #0056b3;
+            }
+            
+            #submitButton {
+                background-color: #28a745;
+                color: white;
+            }
+            
+            .navigation-buttons button:hover {
+                filter: brightness(90%);
+            }
+            
+            .navigation-buttons button:focus {
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+            }
+            
+            .navigation-buttons button:disabled {
+                opacity: 0.65;
+                cursor: not-allowed;
+            }
+            
+            .question-progress {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin: 20px 0;
+            }
+            
+            .question-dot {
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                background-color: #e0e0e0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            
+            .question-dot.answered {
+                background-color: #4caf50;
+                color: white;
+            }
+            
+            .question-dot.current {
+                border: 2px solid #2196f3;
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
+            }
+        </style>
+        <script>
+            // Check if running in iframe
+            $(document).ready(function() {
+                if (window.self !== window.top) {
+                    // We're in an iframe
+                    document.body.classList.add('iframe-mode');
+                }
+                
+                // Check camera access
+                checkCameraAccess();
+            });
+            
+            async function checkCameraAccess(isRetry = false) {
+                const cameraStatus = document.getElementById('cameraStatus');
+                const startButton = document.getElementById('startButton');
+                const retryButton = document.getElementById('retryCamera');
+                const cameraFeedImg = document.getElementById('cameraFeed');
+                
+                console.log("Running checkCameraAccess, isRetry:", isRetry);
+
+                cameraStatus.className = 'alert alert-info'; // Use info state while checking
+                cameraStatus.textContent = 'Initializing camera feed...';
+                startButton.style.display = 'none';
+                retryButton.style.display = 'none';
+
+                // Force reload the image source by adding/updating a timestamp
+                const baseUrl = "{{ url_for('video_capture') }}";
+                cameraFeedImg.src = baseUrl + "?t=" + new Date().getTime();
+                
+                // Assume success after a short delay, allowing the stream to start
+                // This avoids unreliable onload for MJPEG streams
+                setTimeout(() => {
+                    console.log("Timeout finished, assuming camera success.");
+                    // Check if an error wasn't manually triggered before this timeout
+                    if (!cameraStatus.classList.contains('alert-danger')) {
+                        cameraStatus.className = 'alert alert-success';
+                        cameraStatus.textContent = '✓ Camera feed should be active. Proceed when ready.';
+                        startButton.style.display = 'block';
+                        retryButton.style.display = 'none';
+                    }
+                }, 3000); // 3 second delay - adjust if needed
+            }
+            
+            // Ensure the retry button calls the simplified check
+            document.getElementById('retryCamera').onclick = function() {
+                checkCameraAccess(true);
+            };
+
+            // Add NEW event listener for start button (ensure it only runs once)
+            const startBtn = document.getElementById('startButton');
+            if (!startBtn.hasAttribute('data-listener-added')) { 
+                startBtn.addEventListener('click', function() {
+                    document.getElementById('welcomeScreen').style.display = 'none';
+                    document.getElementById('quizContent').style.display = 'block';
+                    // Call the startExam function from script.js if it exists
+                    if (typeof startExam === 'function') { 
+                        startExam();
+                    } else {
+                        console.error('startExam function not found. Ensure script.js is loaded.');
+                    }
+                });
+                startBtn.setAttribute('data-listener-added', 'true');
+            }
+        </script>
     </head>
-    <body>
-     <header>
-        <nav class="navbar navbar-expand-md" >
-            <span class="text">The Online Exam Proctor</span>
-
-            <span class="ml-auto" id="timer"></span>
-        </nav>
-    </header>
-    <main>
-
-        <br>
-        <br>
-        <div class="container">
-            <a class="btn btn-outline-info rounded" style="display: none;" id = "navhighscorelink" >High Scores</a>
-            <div class="card mt-5" >
-                <div class="card-body">
-                    <h2 class="card-title mb-4 text-center" id="title" style="color: #5f9ea0;">Exam Test</h2>
-                    <hr class="line">
-                    <div class="row">
-                        <div class="col-md-1"></div>
-
-                        <div class="col-md-10">
-
-                            <div id="mainContent">
-
-                                <h5 class="text-center">
-                                    Answer the following questions within the time limit. Keep in mind that incorrect answers will penalize your score/time by 5 minutes!
-                                </h5>
-
-                                <div class="text-center">
-                                    <button type="submit" id="startQuiz" class="btn text-white rounded-pill mb-2 mt-2" style="background: #5f9ea0;">Start Quiz</button>
-                                </div>
-
+    <body class="iframe-mode">
+        <div class="container mt-4">
+            <!-- Timer -->
+            <div class="timer-container">
+                <div class="timer" id="timer">Time Remaining: <span id="time">{{ duration }}:00</span></div>
+            </div>
+            
+            <!-- Camera Feed -->
+            <div class="camera-container">
+                <!-- Remove inline onload/onerror -->
+                <img id="cameraFeed" 
+                     class="camera-feed" 
+                     src="{{ url_for('video_capture') }}" 
+                     alt="Camera Feed">
+            </div>
+            
+            <!-- Main Content -->
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>{{ exam_title }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <!-- Camera Error Messages -->
+                            <div id="cameraError" class="camera-error">
+                                Camera access is required for this exam. Please enable your camera and refresh the page.
                             </div>
-
-                            <div id = "quizContent" ></div>
-                            <div id = "completeTest"></div>
-
+                            
+                            <!-- Welcome Screen -->
+                            <div id="welcomeScreen">
+                                <div class="alert alert-info">
+                                    <h5 class="alert-heading">Before you begin</h5>
+                                    <p>Please ensure:</p>
+                                    <ul>
+                                        <li>Your camera is working (you should see yourself in the bottom right)</li>
+                                        <li>You are in a well-lit, quiet environment</li>
+                                        <li>You have stable internet connection</li>
+                                        <li>You have read all exam instructions</li>
+                                    </ul>
+                                </div>
+                                <div id="cameraStatus" class="alert alert-warning">
+                                    Checking camera access...
+                                </div>
+                                <button id="startButton" class="btn btn-primary btn-lg" style="display: none;">Start Exam</button>
+                                <button id="retryCamera" class="btn btn-secondary" onclick="checkCameraAccess()" style="display: none;">Retry Camera</button>
+                            </div>
+                            
+                            <!-- Quiz Content -->
+                            <div id="quizContent" style="display: none;">
+                                <!-- Question Progress -->
+                                <div class="question-progress" id="questionProgress"></div>
+                                
+                                <!-- Question Card -->
+                                <div class="question-card">
+                                    <div class="question-number" id="questionNumber"></div>
+                                    <div class="question-text" id="questionText"></div>
+                                    <div id="options"></div>
+                                </div>
+                                
+                                <!-- Navigation -->
+                                <div class="navigation-buttons">
+                                    <button id="prevButton" class="btn btn-secondary">Previous</button>
+                                    <button id="submitButton" class="btn btn-success" style="display: none;">Submit Exam</button>
+                                    <button id="nextButton" class="btn btn-primary">Next</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <div id="answer">
-                         <hr class="line">
-                    </div>
-
                 </div>
             </div>
-
         </div>
-        <br/>
 
-        <footer>
-            <p>&copy; The Online Exam Proctor System</p>
-        </footer>
-    </main>
-
-
-    <script src="{{url_for('static', filename='js/questions.js')}}"></script>
-    <script src="{{url_for('static', filename='js/script.js')}}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+        <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     </body>
-
 </html>

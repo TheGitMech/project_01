@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -26,19 +27,22 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
-staticfiles/
 
 # Virtual Environment
 venv/
-env/
 ENV/
-.env
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Project specific
+*.mp4
+*.whl
+static/Profiles/
+dlib-19.24.99-cp312-cp312-win_amd64.whl
 
 # Docker
 .docker/

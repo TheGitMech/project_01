@@ -1,123 +1,141 @@
 <!DOCTYPE html>
-<html lang="en" title="System Check" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Exam System Check</title>
-    <link rel="stylesheet" href="{{url_for('static', filename='css/SystemCheck.css')}}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
+    <title>System Check</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .camera-container {
+            width: 640px;
+            height: 480px;
+            margin: 20px auto;
+            position: relative;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .status-message {
+            margin: 15px auto;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            max-width: 600px;
+        }
+        .error-message {
+            background-color: #ffe6e6;
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+        .success-message {
+            background-color: #e6ffe6;
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+        .proceed-button {
+            display: none;
+            margin: 20px auto;
+            padding: 10px 30px;
+        }
+        .retry-button {
+            margin: 10px auto;
+            display: block;
+        }
+    </style>
 </head>
-
 <body>
-    <nav>
-      <div class="left-links">
-        <p class="P-title">The Online Exam Proctor</p>
-      </div>
-      <div class="right-links">
-        <a class="links" href="#"> Rules</a>
-        <a class="links" href="#">Requirements</a>
-      </div>
-    </nav>
-    <main class="table">
-        <section class="table__header">
-            <h1>System Compatibility Check</h1>
-            <div class="export__file">
-               <label for="export-file" class="export__file-btn" title="System Check"></label>
-                <input type="checkbox" id="export-file">
-            </div>
-        </section>
-        <section class="table__body">
-            <table>
-                <thead>
-                    <tr>
-                        <th> Device <span class="icon-arrow">&UpArrow;</span></th>
-                        <th> Status <span class="icon-arrow">&UpArrow;</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td> Webcam :</td>
-                        <td> <p id="webcam-status"> </p></td>
-                    </tr>
-                     <tr>
-                        <td> Microphone : </td>
-                        <td><p id="microphone-status"> </p></td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-        <section class="section-button">
-        <div class="nextButton">
-        <a href="#" class="next" id="ajax-link" >Next &raquo;</a>
-      </div>
-      </section>
-
-
-    </main>
-        <footer>
-        <div class="container8">
-          <div>
-            <p class="box-footer1">&copy; The Online Exam Proctor System</p>
-          </div>
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">System Check</h2>
+        
+        <div class="camera-container">
+            <img id="videoElement" src="{{ url_for('video_capture') }}">
         </div>
-      </footer>
-     <script>
+        
+        <div id="statusMessage" class="status-message error-message">
+            Checking camera access and face detection...
+        </div>
+        
+        <button id="retryButton" class="btn btn-secondary retry-button">Retry Camera Check</button>
+        <button id="proceedButton" class="btn btn-primary proceed-button">Proceed to Exam</button>
+    </div>
 
+    <script>
+        let faceDetected = false;
+        let checkInterval;
+        const statusMessage = document.getElementById('statusMessage');
+        const proceedButton = document.getElementById('proceedButton');
+        const retryButton = document.getElementById('retryButton');
+        const videoElement = document.getElementById('videoElement');
 
-        async function checkWebcamAndMicrophone() {
-            const webcamStatusElement = document.getElementById('webcam-status');
-            const microphoneStatusElement = document.getElementById('microphone-status');
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                webcamStatusElement.textContent = 'Available';
-                microphoneStatusElement.textContent = 'Available';
-
-                stream.getTracks().forEach(track => track.stop());
-            } catch (error) {
-                webcamStatusElement.textContent = 'Not available';
-                microphoneStatusElement.textContent = 'Not available';
-            }
+        function updateStatus(message, isSuccess) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message ' + (isSuccess ? 'success-message' : 'error-message');
+            proceedButton.style.display = isSuccess ? 'block' : 'none';
         }
 
-        checkWebcamAndMicrophone();
+        function checkFaceDetection() {
+            fetch('/check_face')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Face detection response:', data);  // Debug log
+                    
+                    if (data.faceDetected) {
+                        faceDetected = true;
+                        updateStatus('Face detected successfully! You can proceed with the exam.', true);
+                        clearInterval(checkInterval);
+                    } else {
+                        faceDetected = false;
+                        updateStatus(data.message || 'Please ensure your face is clearly visible in the camera.', false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Face detection error:', error);
+                    updateStatus('Error checking face detection. Please try again.', false);
+                });
+        }
 
-    </script>
-<script>
-     $(document).ready(function() {
-    // Add a click event handler to the anchor element
-    $("#ajax-link").click(function(event) {
-        event.preventDefault(); // Prevent the default behavior of navigating to a new page
-
-        // Get the text content of the elements
-        const checkValue1 = document.getElementById('webcam-status').textContent;
-        const checkValue2 = document.getElementById('microphone-status').textContent;
-
-        // Perform the AJAX request using jQuery's $.ajax() function
-        $.ajax({
-            url: "/systemCheck",
-            type: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({ input: checkValue1 + ';' + checkValue2 }), // Use + to concatenate
-            success: function(response) {
-                console.log(response);
-                console.log(response['output']);
-
-                // Redirect to result.html on success
-                window.location.href = "/" + response['output'];
-            },
-            error: function(xhr, status, error) {
-                // Handle errors here if needed
-                console.error("AJAX request failed:", error);
+        function startChecking() {
+            // Clear any existing interval
+            if (checkInterval) {
+                clearInterval(checkInterval);
             }
-        });
-    });
-});
+            
+            // Initial check
+            checkFaceDetection();
+            
+            // Set up periodic checks
+            checkInterval = setInterval(checkFaceDetection, 2000);
+        }
 
+        // Start checking when video feed is loaded
+        videoElement.onload = function() {
+            console.log('Video feed loaded');  // Debug log
+            startChecking();
+        };
+
+        // Handle retry button click
+        retryButton.onclick = function() {
+            console.log('Retrying camera check');  // Debug log
+            updateStatus('Checking camera access and face detection...', false);
+            startChecking();
+        };
+
+        // Handle proceed button click
+        proceedButton.onclick = function() {
+            if (faceDetected) {
+                window.location.href = '/exam';
+            } else {
+                updateStatus('Please wait for face detection before proceeding.', false);
+            }
+        };
+
+        // Initial check
+        startChecking();
     </script>
 </body>
-
 </html>

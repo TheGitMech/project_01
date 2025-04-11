@@ -2,7 +2,6 @@ import sys
 import face_recognition
 from concurrent.futures import ThreadPoolExecutor
 import cv2
-import mediapipe as mp
 import numpy as np
 import time
 import math
@@ -44,9 +43,7 @@ capa.release()
 video = [(str(random.randint(1,50000))+".mp4"), (str(random.randint(1,50000))+".mp4"), (str(random.randint(1,50000))+".mp4"), (str(random.randint(1,50000))+".mp4"), (str(random.randint(1,50000))+".mp4")]
 writer = [cv2.VideoWriter(video[0], cv2.VideoWriter_fourcc(*'mp4v'), 20, (width,height)), cv2.VideoWriter(video[1], cv2.VideoWriter_fourcc(*'mp4v'), 20, (width,height)), cv2.VideoWriter(video[2], cv2.VideoWriter_fourcc(*'mp4v'), 20, (width,height)), cv2.VideoWriter(video[3], cv2.VideoWriter_fourcc(*'mp4v'), 15, (1920, 1080)), cv2.VideoWriter(video[4], cv2.VideoWriter_fourcc(*'mp4v'), 20 , (EDWidth,EDHeight))]
 #More than One Person Related
-mpFaceDetection = mp.solutions.face_detection  # Detect the face
-mpDraw = mp.solutions.drawing_utils  # Draw the required Things for BBox
-faceDetection = mpFaceDetection.FaceDetection(0.75)# It has 0 to 1 (Change this to make it more detectable) Default is 0.5 and higher means more detection.
+face_cascade = cv2.CascadeClassifier('Haarcascades/haarcascade_frontalface_default.xml')
 #Screen Related
 shorcuts = []
 active_window = None # Store the initial active window and its title
@@ -138,42 +135,51 @@ def faceDetectionRecording(img, text):
     global start_time, end_time, recorded_durations, prev_state, flag, writer, width, height
     print("Running FaceDetection Recording Function")
     print(text)
-    if text != 'Verified Student appeared' and prev_state[0] == 'Verified Student appeared':
-        start_time[0] = time.time()
-        for _ in range(2):
-            writer[0].write(img)
-    elif text != 'Verified Student appeared' and str(text) == prev_state[0] and (time.time() - start_time[0]) > 3:
-        flag[0] = True
-        for _ in range(2):
-            writer[0].write(img)
-    elif text != 'Verified Student appeared' and str(text) == prev_state[0] and (time.time() - start_time[0]) <= 3:
-        flag[0] = False
-        for _ in range(2):
-            writer[0].write(img)
-    else:
-        if prev_state[0] != "Verified Student appeared":
-            writer[0].release()
-            end_time[0] = time.time()
-            duration = math.ceil((end_time[0] - start_time[0]) / 3)
-            outputVideo = 'FDViolation' + video[0]
-            FDViolation = {
-                "Name": prev_state[0],
-                "Time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time[0])),
-                "Duration": str(duration) + " seconds",
-                "Mark": math.floor(2 * duration),
-                "Link": outputVideo,
-                "RId": get_resultId()
-            }
-            if flag[0]:
-                recorded_durations.append(FDViolation)
-                write_json(FDViolation)
-                reduceBitRate(video[0], outputVideo)
-                move_file_to_output_folder(outputVideo)
-            os.remove(video[0])
-            print(recorded_durations)
-            video[0] = str(random.randint(1, 50000)) + ".mp4"
-            writer[0] = cv2.VideoWriter(video[0], cv2.VideoWriter_fourcc(*'mp4v'), 20, (width, height))
+    try:
+        if text != 'Verified Student appeared' and prev_state[0] == 'Verified Student appeared':
+            start_time[0] = time.time()
+            if writer[0] is not None and writer[0].isOpened():
+                writer[0].write(img)
+        elif text != 'Verified Student appeared' and str(text) == prev_state[0] and (time.time() - start_time[0]) > 3:
+            flag[0] = True
+            if writer[0] is not None and writer[0].isOpened():
+                writer[0].write(img)
+        elif text != 'Verified Student appeared' and str(text) == prev_state[0] and (time.time() - start_time[0]) <= 3:
             flag[0] = False
+            if writer[0] is not None and writer[0].isOpened():
+                writer[0].write(img)
+        else:
+            if prev_state[0] != "Verified Student appeared":
+                if writer[0] is not None and writer[0].isOpened():
+                    writer[0].release()
+                end_time[0] = time.time()
+                duration = math.ceil((end_time[0] - start_time[0]) / 3)
+                outputVideo = 'FDViolation' + video[0]
+                FDViolation = {
+                    "Name": prev_state[0],
+                    "Time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time[0])),
+                    "Duration": str(duration) + " seconds",
+                    "Mark": math.floor(2 * duration),
+                    "Link": outputVideo,
+                    "RId": get_resultId()
+                }
+                if flag[0]:
+                    recorded_durations.append(FDViolation)
+                    write_json(FDViolation)
+                    try:
+                        reduceBitRate(video[0], outputVideo)
+                        move_file_to_output_folder(outputVideo)
+                    except Exception as e:
+                        print(f"Error processing video: {e}")
+                try:
+                    os.remove(video[0])
+                except:
+                    pass
+                video[0] = str(random.randint(1, 50000)) + ".mp4"
+                writer[0] = cv2.VideoWriter(video[0], cv2.VideoWriter_fourcc(*'mp4v'), 20, (width, height))
+                flag[0] = False
+    except Exception as e:
+        print(f"Error in faceDetectionRecording: {e}")
     prev_state[0] = text
 
 #Recording Function for Head Movement Detection
@@ -498,188 +504,103 @@ class FaceRecognition:
 def headMovmentDetection(image, face_mesh):
     print("Running HeadMovement Function")
     # Flip the image horizontally for a later selfie-view display
-    # Also convert the color space from BGR to RGB
-    image = cv2.cvtColor(cv2.flip(image, 1), cv2.COLOR_BGR2RGB)
-
-    # To improve performance
-    image.flags.writeable = False
-
-    # Get the result
-    results = face_mesh.process(image)
-
-    # To improve performance
-    image.flags.writeable = True
-
-    # Convert the color space from RGB to BGR
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-    img_h, img_w, img_c = image.shape
-    face_3d = []
-    face_2d = []
-
-    if results.multi_face_landmarks:
-        for face_landmarks in results.multi_face_landmarks:
-            for idx, lm in enumerate(face_landmarks.landmark):
-                if idx == 33 or idx == 263 or idx == 1 or idx == 61 or idx == 291 or idx == 199:
-                    if idx == 1:
-                        nose_2d = (lm.x * img_w, lm.y * img_h)
-                        nose_3d = (lm.x * img_w, lm.y * img_h, lm.z * 8000)
-
-                    x, y = int(lm.x * img_w), int(lm.y * img_h)
-
-                    # Get the 2D Coordinates
-                    face_2d.append([x, y])
-
-                    # Get the 3D Coordinates
-                    face_3d.append([x, y, lm.z])
-
-                    # Convert it to the NumPy array
-            face_2d = np.array(face_2d, dtype=np.float64)
-
-            # Convert it to the NumPy array
-            face_3d = np.array(face_3d, dtype=np.float64)
-
-            # The camera matrix
-            focal_length = 1 * img_w
-
-            cam_matrix = np.array([[focal_length, 0, img_h / 2],
-                                   [0, focal_length, img_w / 2],
-                                   [0, 0, 1]])
-
-            # The Distance Matrix
-            dist_matrix = np.zeros((4, 1), dtype=np.float64)
-
-            # Solve PnP
-            success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)
-
-            # Get rotational matrix
-            rmat, jac = cv2.Rodrigues(rot_vec)
-
-            # Get angles
-            angles, mtxR, mtxQ, Qx, Qy, Qz = cv2.RQDecomp3x3(rmat)
-
-            # Get the y rotation degree
-            x = angles[0] * 360
-            y = angles[1] * 360
-            # print(y)
-            textHead = ''
-            # See where the user's head tilting
-            if y < -10:
-                textHead = "Looking Left"
-            elif y > 15:
-                textHead = "Looking Right"
-            elif x < -8:
-                textHead = "Looking Down"
-            elif x > 15:
-                textHead = "Looking Up"
-            else:
-                textHead = "Forward"
-            # Add the text on the image
-            cv2.putText(image, textHead, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            Head_record_duration(textHead, image)
+    image = cv2.flip(image, 1)
+    
+    # Convert to grayscale for face detection
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Detect faces
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    
+    textHead = "Forward"  # Default position
+    
+    if len(faces) > 0:
+        # Take the first face
+        (x, y, w, h) = faces[0]
+        
+        # Draw rectangle around the face
+        cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        
+        # Calculate face position relative to frame center
+        face_center_x = x + w/2
+        face_center_y = y + h/2
+        frame_center_x = image.shape[1]/2
+        frame_center_y = image.shape[0]/2
+        
+        # Determine head position based on face position
+        x_offset = face_center_x - frame_center_x
+        y_offset = face_center_y - frame_center_y
+        
+        # Normalize by frame dimensions
+        x_offset_norm = x_offset / (image.shape[1]/2)
+        y_offset_norm = y_offset / (image.shape[0]/2)
+        
+        # Determine head position
+        if x_offset_norm < -0.2:
+            textHead = "Looking Left"
+        elif x_offset_norm > 0.2:
+            textHead = "Looking Right"
+        elif y_offset_norm < -0.2:
+            textHead = "Looking Up"
+        elif y_offset_norm > 0.2:
+            textHead = "Looking Down"
+        else:
+            textHead = "Forward"
+            
+    # Add the text on the image
+    cv2.putText(image, textHead, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    Head_record_duration(textHead, image)
 
 
 #Third : More than one person Detection Function
 def MTOP_Detection(img):
     print("Running MTOP Function")
-    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = faceDetection.process(imgRGB)
+    # Convert to grayscale for face detection
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Detect faces
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    
     textMTOP = ''
-    if results.detections:
-        for id, detection in enumerate(results.detections):
-            bboxC = detection.location_data.relative_bounding_box
-            ih, iw, ic = img.shape
-            bbox = int(bboxC.xmin * iw), int(bboxC.ymin * ih), \
-                int(bboxC.width * iw), int(bboxC.height * ih)
-            # Drawing the recantangle
-            cv2.rectangle(img, bbox, (255, 0, 255), 2)
-            # cv2.putText(img, f'{int(detection.score[0] * 100)}%', (bbox[0], bbox[1] - 20), cv2.FONT_HERSHEY_PLAIN, 3, (255, 255, 255), 10)
-        if id > 0:
-            textMTOP = "More than one person is detected."
-        else:
-            textMTOP = "Only one person is detected"
+    
+    # Draw rectangles around each face
+    for (x, y, w, h) in faces:
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 255), 2)
+    
+    # Determine if more than one person is detected
+    if len(faces) > 1:
+        textMTOP = "More than one person is detected."
     else:
-        textMTOP="Only one person is detected"
+        textMTOP = "Only one person is detected"
+    
     MTOP_record_duration(textMTOP, img)
     print(textMTOP)
 
 #Fourth : Screen Detection Function ( Key-words and Screens)
 def shortcut_handler(event):
-    if event.event_type == keyboard.KEY_DOWN:
-        shortcut = ''
-        # Check for Ctrl+C
-        if keyboard.is_pressed('ctrl') and keyboard.is_pressed('c'):
-            shortcut += 'Ctrl+C'
-            print("Ctrl+C shortcut detected!")
-        # Check for Ctrl+V
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('v'):
-            shortcut += 'Ctrl+V'
-            print("Ctrl+V shortcut detected!")
-        # Check for Ctrl+A
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('a'):
-            shortcut += 'Ctrl+A'
-            print("Ctrl+A shortcut detected!")
-        # Check for Ctrl+X
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('x'):
-            shortcut += 'Ctrl+X'
-            print("Ctrl+X shortcut detected!")
-        # Check for Alt+Shift+Tab
-        elif keyboard.is_pressed('alt') and keyboard.is_pressed('shift') and keyboard.is_pressed('tab'):
-            shortcut += 'Alt+Shift+Tab'
-            print("Alt+Shift+Tab shortcut detected!")
-        # Check for Win+Tab
-        elif keyboard.is_pressed('win') and keyboard.is_pressed('tab'):
-            shortcut += 'Win+Tab'
-            print("Win+Tab shortcut detected!")
-        # Check for Alt+Esc
-        elif keyboard.is_pressed('alt') and keyboard.is_pressed('esc'):
-            shortcut += 'Alt+Esc'
-            print("Alt+Esc shortcut detected!")
-        # Check for Alt+Tab
-        elif keyboard.is_pressed('alt') and keyboard.is_pressed('tab'):
-            shortcut += 'Alt+Tab'
-            print("Alt+Tab shortcut detected!")
-        # Check for Ctrl+Esc
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('esc'):
-            shortcut += 'Ctrl+Esc'
-            print("Ctrl+Esc shortcut detected!")
-        # Check for Function Keys F1
-        elif keyboard.is_pressed('f1'):
-            shortcut += 'F1'
-            print("F1 shortcut detected")
-        # Check for Function Keys F2
-        elif keyboard.is_pressed('f2'):
-            shortcut += 'F2'
-            print("F2 shortcut detected!")
-        # Check for Function Keys F3
-        elif keyboard.is_pressed('f3'):
-            shortcut += 'F3'
-            print("F3 shortcut detected!")
-        # Check for Window Key
-        elif keyboard.is_pressed('win'):
-            shortcut += 'Window'
-            print("Window shortcut detected!")
-        # Check for Ctrl+Alt+Del
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('alt') and keyboard.is_pressed('del'):
-            shortcut += 'Ctrl+Alt+Del'
-            print("Ctrl+Alt+Del shortcut detected!")
-        # Check for Prt Scn
-        elif keyboard.is_pressed('print_screen'):
-            shortcut += 'Prt Scn'
-            print("Prt Scn shortcut detected!")
-        # Check for Ctrl+T
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('t'):
-            shortcut += 'Ctrl+T'
-            print("Ctrl+T shortcut detected!")
-        # Check for Ctrl+W
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('w'):
-            shortcut += 'Ctrl+W'
-            print("Ctrl+W shortcut detected!")
-        # Check for Ctrl+Z
-        elif keyboard.is_pressed('ctrl') and keyboard.is_pressed('z'):
-            shortcut += 'Ctrl+Z'
-            print("Ctrl+Z shortcut detected!")
-        shorcuts.append(shortcut) if shortcut != "" else None
+    global shorcuts, Globalflag
+    if not Globalflag:
+        return
+        
+    # List of prohibited shortcuts
+    prohibited_shortcuts = {
+        'alt+tab': 'Alt+Tab',
+        'alt+esc': 'Alt+Esc',
+        'win+d': 'Windows+D',
+        'win+m': 'Windows+M',
+        'win+tab': 'Windows+Tab',
+        'ctrl+alt+del': 'Ctrl+Alt+Del',
+        'ctrl+esc': 'Ctrl+Esc',
+        'alt+f4': 'Alt+F4'
+    }
+    
+    # Get the shortcut combination
+    shortcut = event.name.lower()
+    if event.event_type == 'down':
+        if shortcut in prohibited_shortcuts:
+            if shortcut not in shorcuts:
+                shorcuts.append(shortcut)
+                print(f"Prohibited shortcut detected: {prohibited_shortcuts[shortcut]}")
 
 def screenDetection():
     global active_window, active_window_title, exam_window_title
@@ -858,12 +779,13 @@ class Recorder:
 def cheat_Detection1():
     deleteTrashVideos()
     global Globalflag
-    mp_face_mesh = mp.solutions.face_mesh
-    face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    # Remove mediapipe initialization
     print(f'CD1 Flag is {Globalflag}')
     while Globalflag:
         success, image = cap.read()
-        headMovmentDetection(image, face_mesh)
+        # Pass None instead of face_mesh, the headMovmentDetection function has been refactored
+        # to handle face detection without mediapipe
+        headMovmentDetection(image, None)
     if Globalflag:
         cap.release()
     deleteTrashVideos()

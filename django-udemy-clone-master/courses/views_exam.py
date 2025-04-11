@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from .models import Course, ProctoredExam, ExamAttempt, Certificate
 import uuid
+import urllib.parse
 
 @login_required
 def exam_list(request, course_slug):
@@ -41,13 +42,33 @@ def start_exam(request, exam_id):
 def exam_in_progress(request, attempt_id):
     attempt = get_object_or_404(ExamAttempt, id=attempt_id, user=request.user)
     
-    # Get the Flask app URL (you'll need to configure this in settings.py)
-    proctor_url = f"http://localhost:5000/exam?attempt_id={attempt_id}"
+    # Build parameters for Flask app
+    params = {
+        'attempt_id': attempt_id,
+        'user_id': request.user.id,
+        'username': request.user.get_full_name() or request.user.email.split('@')[0],
+        'email': request.user.email,
+        'exam_id': attempt.exam.id,
+        'exam_name': attempt.exam.title,
+        'course_id': attempt.exam.course.slug
+    }
     
-    return render(request, 'courses/exam_in_progress.html', {
-        'attempt': attempt,
-        'proctor_url': proctor_url
-    })
+    # Encode parameters for URL
+    encoded_params = urllib.parse.urlencode(params)
+    
+    # Get the Flask app URL with debug information
+    proctor_url = f"http://localhost:5000/exam?{encoded_params}"
+    print(f"Debug - Proctor URL: {proctor_url}")
+    
+    return render(
+        request=request,
+        template_name='courses/exam_in_progress.html',
+        context={
+            'attempt': attempt,
+            'proctor_url': proctor_url,
+            'debug_params': params
+        }
+    )
 
 @login_required
 def complete_exam(request, attempt_id):

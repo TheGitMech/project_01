@@ -1,56 +1,166 @@
-
 <!DOCTYPE html>
-<html lang="en" title="System Check">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Exam Face Input</title>
-    <link rel="stylesheet" href="{{url_for('static', filename='css/FaceInput.css')}}">
+    <title>Face Registration - Online Exam Proctor</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .camera-container {
+            width: 640px;
+            height: 480px;
+            margin: 0 auto;
+            position: relative;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 1.2em;
+            display: none;
+        }
+        
+        .camera-error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .camera-guide {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .capture-btn {
+            width: 200px;
+            height: 50px;
+            font-size: 1.2em;
+            margin-top: 20px;
+        }
+        
+        .loading-spinner {
+            display: none;
+            margin: 20px auto;
+        }
+    </style>
 </head>
-
 <body>
-    <nav>
-      <div class="left-links">
-        <p class="P-title">The Online Exam Proctor</p>
-      </div>
-      <div class="right-links">
-        <a class="links" href="#"> Rules</a>
-        <a class="links" href="#">Requirements</a>
-      </div>
-    </nav>
-    <div class="container">
-    <main class="table">
-        <section class="table__header">
-            <h1>Face Input</h1>
-            <div class="export__file">
-               <label for="export-file" class="export__file-btn" title="Face Input"></label>
-                <input type="checkbox" id="export-file">
-            </div>
-        </section>
-        <section class="table__body">
-                <div>
-                   <img src="{{ url_for('video_capture') }}" width="100%" class="host-img">
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Face Registration</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="camera-guide">
+                            <h5>Instructions:</h5>
+                            <ul>
+                                <li>Position your face in the center of the frame</li>
+                                <li>Ensure good lighting on your face</li>
+                                <li>Remove any face coverings</li>
+                                <li>Look directly at the camera</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="cameraError" class="camera-error">
+                            Camera access is required. Please enable your camera and refresh the page.
+                        </div>
+                        
+                        <div class="camera-container">
+                            <img id="cameraFeed" class="camera-feed" src="{{ url_for('video_capture') }}" alt="Camera Feed">
+                            <div id="cameraOverlay" class="camera-overlay">
+                                <div class="text-center">
+                                    <div class="spinner-border text-light mb-3" role="status">
+                                        <span class="sr-only">Loading...</span>
+                                    </div>
+                                    <div>Processing...</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div id="loadingSpinner" class="spinner-border text-primary loading-spinner" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                            <button id="captureBtn" class="btn btn-primary capture-btn" onclick="captureFace()">
+                                Capture Photo
+                            </button>
+                        </div>
+                    </div>
                 </div>
-        </section>
-        <section class="section-button">
-            <p class="table__text">Make ensure that your face is properly positioned within the green rectangle box before capturing the photograph. </p>
-        <section class="section-button">
-        <div class="nextButton">
-        <a href="{{ url_for('saveFaceInput') }}" class="next" >Save Image</a>
-      </div>
-      </section>
-    </main>
-    <footer>
-        <div class="container8">
-          <div>
-            <p class="box-footer1">&copy; The Online Exam Proctor System</p>
-          </div>
+            </div>
         </div>
-      </footer>
-
     </div>
-</body>
 
+    <script>
+        // Check camera access when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    // Camera access granted
+                    stream.getTracks().forEach(track => track.stop());
+                    document.getElementById('cameraError').style.display = 'none';
+                })
+                .catch(function(err) {
+                    // Camera access denied
+                    document.getElementById('cameraError').style.display = 'block';
+                    document.getElementById('captureBtn').disabled = true;
+                    console.error("Camera error:", err);
+                });
+        });
+
+        function captureFace() {
+            const overlay = document.getElementById('cameraOverlay');
+            const spinner = document.getElementById('loadingSpinner');
+            const captureBtn = document.getElementById('captureBtn');
+            
+            // Show loading state
+            overlay.style.display = 'flex';
+            spinner.style.display = 'block';
+            captureBtn.disabled = true;
+            
+            // Make request to save face input
+            fetch('/saveFaceInput')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => { throw new Error(text) });
+                    }
+                    return response;
+                })
+                .then(response => {
+                    // Redirect to confirmation page
+                    window.location.href = response.url;
+                })
+                .catch(error => {
+                    alert(error.message || 'Failed to capture photo. Please try again.');
+                    overlay.style.display = 'none';
+                    spinner.style.display = 'none';
+                    captureBtn.disabled = false;
+                });
+        }
+    </script>
+</body>
 </html>

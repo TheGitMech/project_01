@@ -126,5 +126,37 @@
         "Mark": 0.0,
         "Link": "",
         "RId": 8
+    },
+    {
+        "Name": "Prohibited Shorcuts (Alt+Tab) are detected.",
+        "Time": "8 Counts",
+        "Duration": "",
+        "Mark": 12.0,
+        "Link": "",
+        "RId": 9
+    },
+    {
+        "Name": "Prohibited Shorcuts () are detected.",
+        "Time": "0 Counts",
+        "Duration": "",
+        "Mark": 0.0,
+        "Link": "",
+        "RId": 10
+    },
+    {
+        "Name": "Prohibited Shorcuts () are detected.",
+        "Time": "0 Counts",
+        "Duration": "",
+        "Mark": 0.0,
+        "Link": "",
+        "RId": 11
+    },
+    {
+        "Name": "Prohibited Shorcuts () are detected.",
+        "Time": "0 Counts",
+        "Duration": "",
+        "Mark": 0.0,
+        "Link": "",
+        "RId": 11
     }
 ]
